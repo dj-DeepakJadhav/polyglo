@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}{{ story.title }} — {{ locale_name }} — Read{% endblock %}
+{% block content %}
+
+{% set p = pages[current] %}
+
+<p><a href="/stories/{{ story.story_id }}" class="meta" style="color:var(--text-dim)">&larr; {{ story.title }} overview</a></p>
+
+<div class="reader">
+  <div class="reader-header">
+    <h1 style="margin:0;">{{ story.title }}</h1>
+    <span style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+      <span class="badge badge-simulated">{{ locale_flag(locale) }} {{ locale_name }}</span>
+      <a href="/stories/{{ story.story_id }}/video?locale={{ locale }}&format=reel" download class="reader-btn"
+         style="padding:0.4rem 0.8rem; font-size:0.85rem; background:linear-gradient(135deg, #e1306c, #f77737); color:white; border-radius:999px; text-decoration:none; font-weight:600;"
+         title="Download 9:16 Instagram Reel / TikTok Video">Download 9:16 Reel &darr;</a>
+      <a href="/stories/{{ story.story_id }}/video?locale={{ locale }}&format=square" download class="reader-btn"
+         style="padding:0.4rem 0.8rem; font-size:0.85rem;" title="Download 1:1 Square Video">Square &darr;</a>
+    </span>
+  </div>
+
+  <div class="reader-page card reel-card">
+    <div class="reel-frame">
+      {% if p.image_sha256 %}
+      <img class="reader-image reel-image" src="/blobs/{{ p.image_sha256 }}" alt="{{ p.visual_prompt[:200] }}">
+      {% else %}
+      <div class="reader-image placeholder reel-image">Illustration not available</div>
+      {% endif %}
+      <div class="reel-caption-overlay">{{ p.text }}</div>
+    </div>
+
+    {% if p.audio_sha256 %}
+    <audio controls class="reader-audio" src="/blobs/{{ p.audio_sha256 }}"
+           onerror="this.outerHTML='&lt;span class=&quot;badge badge-simulated&quot;&gt;simulated audio (a real Genblaze manifest, just no real bytes)&lt;/span&gt;'">
+    </audio>
+    {% endif %}
+
+    <span class="badge badge-{{ p.qa_status }}" style="margin-top:0.75rem;">{{ p.qa_status }}</span>
+  </div>
+
+  <div class="reader-nav">
+    {% if current > 0 %}
+    <a class="reader-btn" href="?page={{ current - 1 }}">&larr; Previous</a>
+    {% else %}
+    <span class="reader-btn reader-btn-disabled">&larr; Previous</span>
+    {% endif %}
+
+    <span class="reader-pageno">Page {{ current + 1 }} of {{ total }}</span>
+
+    {% if current < total - 1 %}
+    <a class="reader-btn" href="?page={{ current + 1 }}">Next &rarr;</a>
+    {% else %}
+    <span class="reader-btn reader-btn-disabled">Next &rarr;</span>
+    {% endif %}
+  </div>
+
+  <div class="reader-dots">
+    {% for i in range(total) %}
+    <a href="?page={{ i }}" class="reader-dot {{ 'active' if i == current }}" aria-label="Page {{ i + 1 }}"></a>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowLeft") {
+      var prev = document.querySelector(".reader-nav a.reader-btn:first-child");
+      if (prev) window.location = prev.href;
+    } else if (e.key === "ArrowRight") {
+      var links = document.querySelectorAll(".reader-nav a.reader-btn");
+      var next = links[links.length - 1];
+      if (next && next.textContent.indexOf("Next") !== -1) window.location = next.href;
+    }
+  });
+</script>
+
+{% endblock %}

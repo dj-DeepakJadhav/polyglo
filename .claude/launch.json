@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "polyglo-web",
+      "runtimeExecutable": "C:\\DJ\\Hackathon\\Backblaze Generative Media Hackathon\\.venv\\Scripts\\python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "polyglo.web:app", "--host", "127.0.0.1", "--port", "8420"],
+      "port": 8420
+    }
+  ]
+}

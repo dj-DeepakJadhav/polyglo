@@ -1,0 +1,143 @@
+{# Rendered standalone by GET /stories/{id}/fragment (htmx polling target)
+   AND included by story.html on first load, so both paths share one source of truth. #}
+<div id="matrix-root"
+     {% if not done %}
+     hx-get="/stories/{{ story.story_id }}/fragment"
+     hx-trigger="every 2.5s"
+     hx-swap="outerHTML"
+     {% endif %}>
+
+  {% if not done %}
+  <div class="card" style="margin-bottom:1.5rem; padding:1.25rem; background:var(--surface-2); border:1px solid var(--border);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+      <span style="font-weight:600; color:var(--text); display:flex; align-items:center; gap:0.5rem;">
+        <span style="display:inline-block; width:12px; height:12px; border:2px solid var(--accent); border-top-color:transparent; border-radius:50%; animation:spin 0.8s linear infinite;"></span>
+        Generating Story Media & QA Verification...
+      </span>
+      <span style="font-size:0.85rem; font-weight:700; color:var(--accent);">{{ progress_pct }}%</span>
+    </div>
+    <div style="width:100%; height:10px; background:var(--border); border-radius:999px; overflow:hidden;">
+      <div style="width:{{ progress_pct }}%; height:100%; background:linear-gradient(90deg, #6366f1, #a855f7); transition:width 0.6s ease; border-radius:999px;"></div>
+    </div>
+    <div class="stepper" style="margin-top:1rem;">
+      {% for step in steps %}
+      <span class="step {{ step.status }}"><span class="dot"></span>{{ step.label }}</span>
+      {% endfor %}
+    </div>
+    {% set err = progress|selectattr("stage", "equalto", "error")|first %}
+    {% if err %}
+    <div style="margin-top:1rem; padding:0.8rem 1rem; background:rgba(239, 68, 68, 0.12); border:1px solid var(--fail); border-radius:8px; color:var(--text); font-size:0.9rem;">
+      <strong style="color:var(--fail);">Generation Alert:</strong> {{ err.detail }}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="stat-row">
+    <div class="stat"><div class="value">{{ story.scenes|length }}</div><div class="label">Scenes</div></div>
+    <div class="stat"><div class="value">{{ locale_matrix|length }}</div><div class="label">Locales</div></div>
+    <div class="stat"><div class="value">{{ "%.1f"|format(dedup.dedup_ratio * 100) }}%</div><div class="label">Deduplicated</div></div>
+    <div class="stat"><div class="value">{{ qa_summary.get("quarantined", 0) }}</div><div class="label">Quarantined</div></div>
+    {% if not done %}
+    <div class="stat"><div class="value">&hellip;</div><div class="label">Generating</div></div>
+    {% endif %}
+  </div>
+
+  <h2>Pictures, drawn once and reused for every language</h2>
+  <div class="scene-grid">
+    {% for scene in story.scenes %}
+    <div class="scene-card">
+      {% if scene.image_sha256 %}
+        <img src="/blobs/{{ scene.image_sha256 }}"
+             alt="scene {{ scene.ordinal }}"
+             onerror="this.outerHTML='&lt;div class=&quot;placeholder&quot;&gt;&#127912; simulated image&lt;/div&gt;'">
+      {% else %}
+        <div class="skeleton skeleton-scene" title="generating illustration&hellip;"></div>
+      {% endif %}
+      <div class="caption">
+        <span>Scene {{ scene.ordinal }}</span>
+        {% if scene.image_sha256 %}
+        <a class="scene-download" title="Download image"
+           href="/blobs/{{ scene.image_sha256 }}?download=scene-{{ scene.ordinal }}.png"
+           download="scene-{{ scene.ordinal }}.png" aria-label="Download image for scene {{ scene.ordinal }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        {% endif %}
+        {% if scene.image_sha256 %}<div class="hash">{{ scene.image_sha256[:16] }}&hellip;</div>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <h2>What's ready, by language and scene</h2>
+  <table class="matrix-table">
+    <thead>
+      <tr>
+        <th>Locale</th>
+        {% for scene in story.scenes %}<th>Scene {{ scene.ordinal }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for locale, cells in locale_matrix.items() %}
+      <tr>
+        <td>{{ locale_flag(locale) }} {{ locale_names.get(locale, locale) }}</td>
+        {% for scene in story.scenes %}
+        {% set cell = cells.get(scene.ordinal) %}
+        <td>
+          {% if cell %}
+          <a class="matrix-cell" href="/stories/{{ story.story_id }}/{{ locale }}/{{ scene.ordinal }}"
+             style="text-decoration:none">
+            <span class="badge badge-{{ cell.qa_status }}" title="{% if cell.qa_status == 'unverified' %}Audio generated & active; automatic ASR verification reached daily quota{% endif %}">{{ cell.qa_status }}</span>
+            {% if cell.wer is not none %}
+            <span class="wer">WER {{ "%.2f"|format(cell.wer) }}</span>
+            {% else %}
+            <span class="wer" style="color:var(--text-dim); font-size:0.72rem;" title="Automatic ASR verification skipped to preserve daily API quota">unverified</span>
+            {% endif %}
+            {% if cell.attempts and cell.attempts > 1 %}<span class="attempts">{{ cell.attempts }} attempts</span>{% endif %}
+          </a>
+          {% else %}
+          <span class="badge badge-pending">pending</span>
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Ready to read</h2>
+  {% if bundles %}
+  <table>
+    <thead><tr><th>Locale</th><th class="num">Image refs</th><th class="num">Audio refs</th><th></th></tr></thead>
+    <tbody>
+      {% for b in bundles %}
+      <tr><td>{{ locale_flag(b.locale) }} {{ locale_names.get(b.locale, b.locale) }}</td>
+          <td class="num">{{ b.image_ref_count }}</td>
+          <td class="num">{{ b.audio_ref_count }}</td>
+          <td style="display:flex; gap:0.4rem;">
+            <a href="/stories/{{ story.story_id }}/read/{{ b.locale }}" class="reader-btn" style="padding:0.3rem 0.8rem; font-size:0.85rem;">Read &rarr;</a>
+            <a href="/stories/{{ story.story_id }}/{{ b.locale }}/video.mp4" download class="reader-btn" style="padding:0.3rem 0.8rem; font-size:0.85rem;" title="Download a narrated video of this story">Video &darr;</a>
+          </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:var(--text-dim)">No bundles yet.</p>
+  {% endif %}
+
+  {% if not done %}
+  <details>
+    <summary style="cursor:pointer; color:var(--text-dim); font-size:0.85rem; margin-top:1rem;">
+      Behind-the-scenes log ({{ progress|length }} events)
+    </summary>
+    <div class="progress-log" style="margin-top:0.5rem;">
+      {% for e in progress %}
+      <div><span class="stage">[{{ e.stage }}]</span>
+        {% if e.locale %}{{ e.locale }}{% endif %}{% if e.ordinal is not none %} #{{ e.ordinal }}{% endif %}
+        — {{ e.detail }}</div>
+      {% endfor %}
+    </div>
+  </details>
+  {% endif %}
+</div>

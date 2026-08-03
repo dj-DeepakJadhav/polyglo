@@ -1,0 +1,19 @@
+{# Rendered standalone by POST /chaos-panel/{model}/toggle AND included by
+   dashboard.html on first load, so both paths share one source of truth —
+   same pattern as _matrix_fragment.html. #}
+<div id="chaos-panel">
+  <div class="chaos-row" title="Turn a model off on purpose and watch the app switch to a backup automatically — the same thing that happens during a real outage.">
+    {% for m in chaos_models %}
+    <button
+      type="button"
+      class="chaos-chip {{ 'chaos-disabled' if m.disabled }}"
+      hx-post="/chaos-panel/{{ m.model }}/toggle"
+      hx-target="#chaos-panel"
+      hx-swap="outerHTML"
+    >
+      <span class="dot"></span>{{ m.model }}
+      <span class="chaos-state">{{ "disabled" if m.disabled else "healthy" }}</span>
+    </button>
+    {% endfor %}
+  </div>
+</div>

@@ -1,0 +1,36 @@
+# Secrets — never end up in the image or a layer
+.env
+.env.local
+*.key
+
+# Not needed at runtime, and .env in here specifically must never be copied in
+docs/
+tests/
+.git/
+.github/
+.claude/
+.codebase-memory/
+
+# Virtualenv / local dev state
+.venv/
+venv/
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Test artifacts that showed up on disk during this session
+*.db
+*.sqlite3
+full_run.txt
+api_only.txt
+*_test_out.txt
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

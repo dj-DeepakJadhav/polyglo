@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Polyglo{% endblock %}
+{% block content %}
+
+<h1>Dashboard</h1>
+<p style="color:var(--text-dim); margin-top:-0.5rem; max-width:64ch;">
+  What actually happened when stories were generated: how much storage was saved by
+  reusing pictures, how many recordings passed the listening check, and what each
+  model cost. These are real measurements from real runs, not samples.
+</p>
+
+{% if not has_data %}
+{# Honest empty state. This page used to seed fake "fixture-story" telemetry into the
+   real lake whenever it found no data, then report it as live on every later visit —
+   see the docstring on web.dashboard_page. Empty is the truthful answer, and real
+   telemetry now survives restarts via the B2 snapshot, so it stays filled once used. #}
+<div class="card">
+  <h2 style="margin-top:0">Nothing recorded yet</h2>
+  <p style="color:var(--text-dim)">
+    No story has finished generating on this instance yet, so there are no real numbers
+    to show. <a href="/">Create a story</a> and this page fills in as it runs.
+  </p>
+  <p style="color:var(--text-dim); font-size:0.85rem; margin-bottom:0">
+    We deliberately don't show sample data here. Numbers on this page are always real.
+  </p>
+</div>
+{% else %}
+
+<h2>Pictures generated once, reused everywhere</h2>
+<p style="color:var(--text-dim); font-size:0.9rem; max-width:64ch;">
+  Every scene's illustration is generated a single time and shared by all the
+  languages, instead of being redrawn for each one. That's the difference between the
+  first two numbers.
+</p>
+<div class="stat-row">
+  <div class="stat"><div class="value">{{ dedup.total_refs }}</div><div class="label">Times a picture or clip is used</div></div>
+  <div class="stat"><div class="value">{{ dedup.unique_blobs }}</div><div class="label">Files actually stored on B2</div></div>
+  <div class="stat"><div class="value">{{ "%.1f"|format(dedup.dedup_ratio * 100) }}%</div><div class="label">Storage saved by reusing them</div></div>
+</div>
+
+<h2>Did the recordings say the right words?</h2>
+<p style="color:var(--text-dim); font-size:0.9rem; max-width:64ch;">
+  Every recording is transcribed back and compared to the script it was read from.
+  <strong>WER</strong> is the share of words that came back different &mdash; 0.00 is a
+  word-perfect match, 0.30 means roughly a third were wrong. Below 0.10 passes; higher
+  is retried on another voice, and anything that never clears is held back for a human.
+  This counts <em>every attempt</em>, not just the final one.
+</p>
+{% if qa_effectiveness %}
+<table>
+  <thead><tr><th>Result</th><th class="num">Attempts</th><th class="num">Average WER</th></tr></thead>
+  <tbody>
+    {% for row in qa_effectiveness %}
+    <tr><td><span class="badge badge-{{ 'pass' if row.status == 'pass' else 'retried' if row.status in ('retry','escalate') else 'error' }}">{{ row.status }}</span></td>
+        <td class="num">{{ row.n }}</td>
+        <td class="num">{{ "%.3f"|format(row.avg_wer) if row.avg_wer is not none else "—" }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p style="color:var(--text-dim)">No recordings have been checked yet.</p>
+{% endif %}
+
+<h2>Caught and fixed automatically</h2>
+<p style="color:var(--text-dim); font-size:0.9rem; max-width:64ch;">
+  Lines that failed the check on the first try and passed on a later one. This is the
+  proof the check does something: without it, each of these would have shipped wrong.
+</p>
+{% if qa_retry_evidence %}
+<table>
+  <thead><tr><th>Story</th><th>Language</th><th class="num">Scene</th><th class="num">Tries needed</th></tr></thead>
+  <tbody>
+    {% for row in qa_retry_evidence[:8] %}
+    <tr><td>{{ row.story_id }}</td><td>{{ row.locale }}</td>
+        <td class="num">{{ row.ordinal }}</td><td class="num">{{ row.attempts }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if qa_retry_evidence|length > 8 %}
+<p style="color:var(--text-dim); font-size:0.85rem;">
+  Showing 8 of {{ qa_retry_evidence|length }}.
+</p>
+{% endif %}
+{% else %}
+<p style="color:var(--text-dim)">Nothing has needed a retry yet.</p>
+{% endif %}
+
+<h2>What each model cost, and how slow it was</h2>
+<p style="color:var(--text-dim); font-size:0.9rem; max-width:64ch;">
+  Straight from the run records. <strong>p95</strong> is the slowest 5% &mdash; the
+  number that actually decides how long a story feels, not the average.
+</p>
+{% if cost_latency_by_model %}
+<div style="overflow-x:auto;">
+<table>
+  <thead><tr><th>Model</th><th class="num">Calls</th><th class="num">Spend (USD)</th>
+             <th class="num">Typical</th><th class="num">Slowest 5%</th><th class="num">Failures</th></tr></thead>
+  <tbody>
+    {% for row in cost_latency_by_model %}
+    <tr><td>{{ row.model }}</td><td class="num">{{ row.calls }}</td>
+        {# "—", not "$0": a null here means no pricing strategy is registered for this
+           model, so spend is unknown. Rendering it as $0 claimed the calls were free,
+           which is a different and unsupported statement. Matches how the latency
+           columns already show unknowns. #}
+        <td class="num">{{ "$%.4f"|format(row.spend_usd) if row.spend_usd is not none else "—" }}</td>
+        <td class="num">{{ "%.0f"|format(row.avg_latency_ms) if row.avg_latency_ms is not none else "—" }}ms</td>
+        <td class="num">{{ "%.0f"|format(row.p95_latency_ms) if row.p95_latency_ms is not none else "—" }}ms</td>
+        <td class="num">{{ row.failures }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p style="color:var(--text-dim)">No generation activity recorded yet.</p>
+{% endif %}
+
+{% endif %}
+
+<h2>Try breaking it on purpose</h2>
+<p style="color:var(--text-dim); font-size:0.9rem; max-width:64ch;">
+  Switch a model off and generate a story. The pipeline should fall back to a working
+  one and carry on, rather than failing. Switch it back on when you're done.
+</p>
+{% include "_chaos_panel.html" %}
+
+<h2>Check a receipt yourself</h2>
+<p style="color:var(--text-dim); font-size:0.9rem; max-width:64ch;">
+  Every generation step writes a signed record listing what was made, by which model,
+  and the SHA-256 of each file. If you have one of those records,
+  <a href="/verify">upload it here</a> and we'll confirm it hasn't been altered.
+  <span style="opacity:0.8">Note: the app doesn't currently offer these records as a
+  download, so this is only useful if you pulled one from the B2 bucket directly.</span>
+</p>
+
+{% endblock %}

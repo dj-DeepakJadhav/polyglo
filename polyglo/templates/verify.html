@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Verify — Polyglo{% endblock %}
+{% block content %}
+
+<h1>Verify a manifest</h1>
+<p style="color:var(--text-dim); margin-top:-0.5rem;">
+  Upload the small receipt file that gets saved next to every image and audio clip we
+  generate. We'll check that the file itself hasn't been altered, and that everything
+  it lists still matches.
+</p>
+
+<form class="card" method="post" action="/verify" enctype="multipart/form-data">
+  <div class="dropzone">
+    <input type="file" name="file" accept=".json,application/json" required>
+  </div>
+  <button type="submit">Verify</button>
+</form>
+
+{% if result %}
+<div class="card">
+  <h2 style="margin-top:0">
+    {% if result.verified %}
+      <span class="verdict-ok">&#9989; Verified</span>
+    {% else %}
+      <span class="verdict-bad">&#10060; Not verified</span>
+    {% endif %}
+  </h2>
+  <p>{{ result.detail }}</p>
+  {% if result.canonical_hash %}
+  <table>
+    <tr><th>Canonical hash</th><td class="hash">{{ result.canonical_hash }}</td></tr>
+    <tr><th>Schema version</th><td>{{ result.schema_version }}</td></tr>
+    <tr><th>Hash matches</th><td>{{ "yes" if result.hash_ok else "no" }}</td></tr>
+    <tr><th>Assets missing sha256</th><td>{{ result.assets_missing_sha256|length }}</td></tr>
+  </table>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

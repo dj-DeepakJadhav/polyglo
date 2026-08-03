@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}{{ locale }} #{{ ordinal }} — {{ story.title }}{% endblock %}
+{% block content %}
+
+<p><a href="/stories/{{ story.story_id }}" class="meta" style="color:var(--text-dim)">&larr; {{ story.title }}</a></p>
+<h1>{{ locale_name }} &middot; Scene {{ ordinal }}</h1>
+{% if ls.wer is not none %}
+<span class="wer" style="margin-left:0.5rem">final WER {{ "%.3f"|format(ls.wer) }}</span>
+{% else %}
+<span class="wer" style="margin-left:0.5rem; color:var(--text-dim); font-size:0.85rem;">(unverified — daily ASR quota preserved / simulated)</span>
+{% endif %}
+
+{% set matching_scene = (story.scenes | selectattr('ordinal', 'equalto', ordinal) | first) %}
+{% if matching_scene and matching_scene.image_sha256 %}
+<div class="detail-scene-image">
+  <img src="/blobs/{{ matching_scene.image_sha256 }}" alt="Scene {{ ordinal }} illustration"
+       onerror="this.parentElement.style.display='none'">
+  <a class="scene-download" title="Download image"
+     href="/blobs/{{ matching_scene.image_sha256 }}?download=scene-{{ ordinal }}.png"
+     download="scene-{{ ordinal }}.png" aria-label="Download scene image">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </a>
+</div>
+{% endif %}
+
+<h2>What was read aloud</h2>
+<div class="card">{{ ls.text }}</div>
+
+{% if ls.transcript %}
+<h2>What the recording actually sounds like it says</h2>
+<div class="card">{{ ls.transcript }}</div>
+
+<h2>Word-level diff</h2>
+<div class="card diff">
+  {% for op, expected, heard in diff_pairs %}
+    {% if op == "equal" %}<span class="eq">{{ expected }}</span>
+    {% elif op == "sub" %}<span class="sub">{{ expected }}</span><span class="sub-heard">{{ heard }}</span>
+    {% elif op == "del" %}<span class="del">{{ expected }}</span>
+    {% elif op == "ins" %}<span class="ins">{{ heard }}</span>
+    {% endif %} {% endfor %}
+</div>
+<p style="color:var(--text-dim); font-size:0.85rem;">
+  <span style="color:var(--fail)">red</span> = a word that's missing or wrong &middot;
+  <span style="color:var(--retry)">amber</span> = an extra word that shouldn't be there
+</p>
+{% endif %}
+
+{% if ls.audio_sha256 %}
+<h2>Listen to it</h2>
+<audio controls src="/blobs/{{ ls.audio_sha256 }}"
+       onerror="this.outerHTML='&lt;span class=&quot;badge badge-simulated&quot;&gt;simulated audio (a real Genblaze manifest, just no real bytes)&lt;/span&gt;'">
+</audio>
+<div class="hash" style="margin-top:0.3rem">{{ ls.audio_sha256 }}</div>
+{% endif %}
+
+<h2>Attempt history: every try, until it sounded right</h2>
+{% if attempts %}
+<div>
+  {% for a in attempts %}
+  <div class="attempt-row {{ a.status }}">
+    <strong>Attempt {{ a.attempt }}</strong> &middot; voice {{ a.voice_model }} &middot;
+    <span class="badge badge-{{ 'pass' if a.status == 'pass' else ('quarantined' if a.status == 'error' else 'retried') }}">{{ a.status }}</span>
+    {% if a.wer is not none %}&middot; WER {{ "%.3f"|format(a.wer) }}{% endif %}
+    &middot; {{ a.latency_ms }}ms
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p style="color:var(--text-dim)">No attempts recorded yet.</p>
+{% endif %}
+
+{% endblock %}

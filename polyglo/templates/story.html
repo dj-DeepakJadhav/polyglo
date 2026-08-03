@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ story.title }} — Polyglo{% endblock %}
+{% block content %}
+
+<p><a href="/" class="meta" style="color:var(--text-dim)">&larr; All stories</a></p>
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; margin-bottom:1rem;">
+  <div>
+    <h1 style="margin:0;">{{ story.title }}</h1>
+    <p style="color:var(--text-dim); margin-top:0.25rem;">
+      CEFR {{ story.cefr }} &middot; {{ story.story_id }}
+    </p>
+  </div>
+  <a href="/dashboard" class="secondary" style="padding:0.4rem 0.8rem; font-size:0.85rem; text-decoration:none; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--surface-2);" title="Check B2 storage & Genblaze provenance telemetry">Verify Provenance Manifest &rarr;</a>
+</div>
+
+{% if story.corrected_source_text %}
+<h2>Your story, cleaned up for level {{ story.cefr }}</h2>
+<div class="card">
+  <p style="color:var(--text-dim); font-size:0.85rem; margin-top:0;">What you wrote</p>
+  <p>{{ story.original_source_text }}</p>
+  {% if story.corrected_source_text != story.original_source_text %}
+  <p style="color:var(--text-dim); font-size:0.85rem; margin-top:1rem;">Cleaned-up version</p>
+  <p>{{ story.corrected_source_text }}</p>
+  {% else %}
+  <p style="color:var(--text-dim); font-size:0.85rem; margin-top:1rem;">No changes needed.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% include "_matrix_fragment.html" %}
+
+{% endblock %}

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Polyglo{% endblock %}</title>
+  <script>
+    // Applied before first paint, in <head>, so there's no flash of the wrong
+    // theme. No stored preference => no data-theme attribute at all => the
+    // plain `@media (prefers-color-scheme)` CSS rules decide, matching the OS.
+    // A hardcoded data-theme="light" here (the previous markup) permanently
+    // pinned light mode and silently broke OS-dark-mode users — real
+    // regression caught live while verifying this file's own CSS rewrite.
+    (function () {
+      var saved = localStorage.getItem("polyglo-theme");
+      if (saved === "light" || saved === "dark") {
+        document.documentElement.setAttribute("data-theme", saved);
+      }
+    })();
+  </script>
+  <script src="/static/htmx.min.js?v={{ static_version }}"></script>
+  <link rel="stylesheet" href="/static/style.css?v={{ static_version }}">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v={{ static_version }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <rect width="24" height="24" rx="7" fill="url(#brand-g)"/>
+        <defs>
+          <linearGradient id="brand-g" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+            <stop offset="0" style="stop-color: var(--accent)"/>
+            <stop offset="1" style="stop-color: var(--accent-2)"/>
+          </linearGradient>
+        </defs>
+        <path d="M12 7.4c-1.3-1-3.1-1.5-4.8-1.3-.6.1-1 .6-1 1.1v9.2c0 .6.6 1.1 1.2 1 1.6-.2 3.3.2 4.6 1.1 1.3-.9 3-1.3 4.6-1.1.6.1 1.2-.4 1.2-1V7.2c0-.5-.4-1-1-1.1-1.7-.2-3.5.3-4.8 1.3z" fill="#fff"/>
+        <path d="M12 7.6v9.6" stroke="#fff" stroke-width=".6" opacity=".45" stroke-linecap="round"/>
+      </svg>
+      Polyglo
+    </a>
+    {# Two destinations only. The theme toggle used to live inside <nav>, which made
+       it read as a third tab, and "Verify" used to be a fourth — a manifest-upload
+       page with no way to obtain a manifest from anywhere in the app (no template
+       links one, no route serves one). It's still reachable at /verify and from the
+       dashboard, where the provenance context it needs actually exists. #}
+    <div class="topbar-right">
+      <nav>
+        <a href="/" {% if nav_active == "stories" %}class="active" aria-current="page"{% endif %}>Stories</a>
+        <a href="/dashboard" {% if nav_active == "dashboard" %}class="active" aria-current="page"{% endif %}>Dashboard</a>
+      </nav>
+      <button type="button" class="theme-toggle" id="theme-toggle" title="Toggle light/dark theme" aria-label="Toggle theme">◐</button>
+    </div>
+  </header>
+
+  <div class="banner {{ 'banner-degraded' if degraded else 'banner-ok' }}">
+    {{ banner }}
+  </div>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer>
+    <div style="display: flex; flex-direction: column; gap: 0.35rem; align-items: center;">
+      <span>Turns one story into many languages, checked before it ships &middot; built on Backblaze B2 + Genblaze</span>
+      <span style="font-size: 0.72rem; color: var(--text-dim); max-width: 40rem; line-height: 1.4;">
+        Note: Story content is processed via NVIDIA NIM, OpenRouter, and Google Gemini APIs. Generated assets are stored on Backblaze B2.
+      </span>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var btn = document.getElementById("theme-toggle");
+      function systemPrefersDark() {
+        return window.matchMedia("(prefers-color-scheme: dark)").matches;
+      }
+      function currentTheme() {
+        var attr = document.documentElement.getAttribute("data-theme");
+        return attr || (systemPrefersDark() ? "dark" : "light");
+      }
+      btn.addEventListener("click", function () {
+        var next = currentTheme() === "dark" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", next);
+        localStorage.setItem("polyglo-theme", next);
+      });
+    })();
+  </script>
+  <script>
+    // Small toast confirmation on any download link/attribute click — the browser's
+    // own download UI is silent and easy to miss, this just confirms the click
+    // registered. Not used for form submissions (those already show progress
+    // elsewhere) — only [download] links and hrefs ending in a known export path.
+    document.addEventListener("click", function (e) {
+      var el = e.target.closest("a[download], a[href*='?download='], a[href$='.mp4']");
+      if (!el) return;
+      var existing = document.querySelector(".download-toast");
+      if (existing) existing.remove();
+      var toast = document.createElement("div");
+      toast.className = "download-toast";
+      toast.textContent = "Downloading…";
+      document.body.appendChild(toast);
+      setTimeout(function () { toast.remove(); }, 2600);
+    });
+  </script>
+</body>
+</html>

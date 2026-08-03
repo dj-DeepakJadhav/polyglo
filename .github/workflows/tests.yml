@@ -1,0 +1,33 @@
+name: Tests
+
+# Zero credentials needed -- the full suite is designed to run with no API keys
+# at all (mock/simulated providers), so this workflow needs no secrets configured.
+# Every test that touches a real provider explicitly monkeypatches make_providers
+# first (see tests/test_api.py and tests/test_web.py docstrings) -- if that ever
+# regresses, this is exactly the run that would start making live network calls
+# and fail loudly on a runner with no real credentials present.
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run test suite
+        run: pytest -q

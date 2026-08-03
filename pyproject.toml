@@ -1,0 +1,88 @@
+[project]
+name = "polyglo"
+version = "0.1.0"
+description = "Comprehensible-input content factory: one story, N locales, automatically verified narration."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+dependencies = [
+    # Generative media orchestration (hackathon requirement)
+    "genblaze==0.4.5",
+    "genblaze-core==0.3.8",
+    "genblaze-s3==0.3.6",
+    # [chat] extra pulls in `openai` — NVIDIA NIM chat is OpenAI-API-compatible and
+    # genblaze-nvidia's chat provider imports it directly. Missing this extra doesn't
+    # fail at install time, only at the first real chat call ("openai package not
+    # installed") — invisible in local dev if `openai` happens to already be present
+    # from something else, which is exactly what masked this until a clean Render
+    # deploy with real credentials hit it (docs/SESSION-LOG.md).
+    "genblaze-nvidia[chat]==0.3.3",
+
+    # Web surface
+    "fastapi>=0.141.1",
+    "uvicorn[standard]>=0.52.0",
+    "jinja2>=3.1.6",
+    "python-multipart>=0.0.32",
+
+    # Data / telemetry
+    "duckdb>=1.5.5",
+    "pyarrow>=25.0.0",
+
+    # Misc
+    "python-dotenv>=1.2.2",
+    "pillow>=11.3.0",
+
+    # ASR verifier — Gemini won the spike (task #17): a real TTS-then-ASR round
+    # trip on real generated audio scored WER 0.0, exact match (docs/SESSION-LOG.md).
+    # A core dependency, not optional, now that GeminiTranscriber is wired into
+    # orchestrator.make_providers() as a real (conditionally activated) production path.
+    "google-genai>=1.0.0",
+
+    # Optional OpenRouter narrator/visual providers (Voxtral TTS, Seedream i2i) call
+    # OpenRouter's REST API directly via plain HTTP — no genblaze provider exists for
+    # either. A core dependency (not an extra) for the same reason genblaze-nvidia's
+    # [chat] extra is: an app started with OPENROUTER_API_KEY set must not fail with
+    # "requests not installed" on a clean install just because it happened to be
+    # present transitively in local dev.
+    "requests>=2.32.0",
+
+    # Narrated video export (scene images + per-scene audio -> one MP4). Ships a
+    # real, per-platform static ffmpeg binary via its own wheel rather than
+    # requiring `apt-get install ffmpeg` in the Dockerfile — confirmed live: this
+    # resolves a real, working ffmpeg 7.1 binary on this dev machine directly via
+    # `pip install`, the same install path every other dependency already uses.
+    "imageio-ffmpeg>=0.6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=9.1.1"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["polyglo*"]
+
+[tool.setuptools.package-data]
+# Without this, `pip install .` silently omits templates/static from the built
+# package — web.py's Jinja2Templates/StaticFiles would then 404 on everything at
+# runtime despite the source tree looking complete. Caught before it became a
+# Docker-only bug (task #16) by checking package-data explicitly rather than
+# assuming setuptools bundles non-.py files by default — it doesn't.
+polyglo = ["templates/*.html", "static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+# Silence only the two known third-party warnings we can't act on, by message —
+# NOT a blanket `ignore::DeprecationWarning`. A blanket ignore would also hide a
+# genuine "this will break in the next release" warning from any dependency, which
+# is exactly the signal this project has twice been burned by missing (see
+# docs/SESSION-LOG.md on the genblaze-nvidia[chat] and openai-already-installed
+# incidents). Keep the net narrow so a real new warning still shows up.
+filterwarnings = [
+    "ignore:.*_UnionGenericAlias.*:DeprecationWarning",
+    "ignore:.*Using `httpx` with `starlette.testclient` is deprecated.*",
+]

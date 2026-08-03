@@ -1,0 +1,31 @@
+# Secrets — never commit
+.env
+.env.local
+*.key
+
+# Virtualenv
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Local data — rebuildable from B2
+data/
+*.db
+*.sqlite3
+output/
+telemetry/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Codebase-memory-mcp knowledge graph — local dev tooling, rebuildable via
+# index_repository, not part of the product. Keep out of the submission repo.
+.codebase-memory/

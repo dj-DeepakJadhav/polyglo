@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Polyglo — Stories{% endblock %}
+{% block content %}
+
+<section class="hero">
+  <h1>One story in, every language out. Narration verified, not assumed.</h1>
+  <p class="tagline">Write once, publish in every language, with narration that's checked before it ships.</p>
+  <div class="hero-steps">
+    <div class="hero-step">
+      <span class="n" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20l1.2-4.4L16.6 4.2a1.5 1.5 0 0 1 2.1 0l1.1 1.1a1.5 1.5 0 0 1 0 2.1L8.4 18.8 4 20z" fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+      <div class="t">Write your story</div>
+      <div class="d">Pick a reading level. We'll fix up the spelling and grammar and match the text to it.</div>
+    </div>
+    <div class="hero-step">
+      <span class="n" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="#fff" stroke-width="1.6"/><circle cx="9" cy="10" r="1.4" fill="#fff"/><path d="M5 17l4.5-4.5 3 3L17 10l3 4.5" fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg></span>
+      <div class="t">Pictures, drawn once</div>
+      <div class="d">Every scene gets one picture, reused across every language instead of redrawn each time.</div>
+    </div>
+    <div class="hero-step">
+      <span class="n" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12h2.5l1.5-5 2 10 2-7 1.5 4h6.5" fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg></span>
+      <div class="t">Checked before it ships</div>
+      <div class="d">We listen to every recording and compare it to the script, trying again if it's wrong.</div>
+    </div>
+  </div>
+</section>
+
+<h1>Create a story</h1>
+
+<form class="card" method="post" action="/stories" hx-boost="true">
+  <div style="background:var(--surface-2); padding:1rem; border-radius:var(--radius-sm); border:1px solid var(--border); margin-bottom:1.25rem;">
+    <label for="auto_prompt" style="font-weight:600; color:var(--text); display:flex; align-items:center; gap:0.4rem;">
+      ✨ Don't have a story? Draft one with AI
+    </label>
+    <div style="display:flex; gap:0.5rem; margin-top:0.4rem; flex-wrap:wrap;">
+      <input type="text" id="auto_prompt" placeholder="e.g. A brave dragon learning to fly with a friendly owl" style="flex:1; min-width:220px; margin:0;">
+      <button type="button" id="btn_auto_gen" class="secondary" style="white-space:nowrap; padding:0.5rem 1rem; margin:0;">
+        Magic Draft ✨
+      </button>
+    </div>
+  </div>
+
+  <label for="title">Title</label>
+  <input type="text" id="title" name="title" required value="The Lost Umbrella">
+
+  <label for="source_text">Source story (English)</label>
+  <textarea id="source_text" name="source_text" required>{{ default_source_text }}</textarea>
+
+  <div class="grid grid-2">
+    <div>
+      <label for="cefr">CEFR level</label>
+      <select id="cefr" name="cefr">
+        {% for level in ["A1", "A2", "B1", "B2", "C1", "C2"] %}
+        <option value="{{ level }}" {{ "selected" if level == "B1" }}>{{ level }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="n_scenes">Number of scenes</label>
+      <input type="text" id="n_scenes" name="n_scenes" value="3">
+    </div>
+  </div>
+
+  <fieldset>
+    <legend>Target locales</legend>
+    <div class="checkbox-row">
+      {% for code, name in all_locales.items() %}
+      <label>
+        <input type="checkbox" name="locales" value="{{ code }}" {{ "checked" if code in default_locales }}>
+        {{ locale_flag(code) }} {{ name }} <span style="color:var(--text-dim)">({{ code }})</span>
+      </label>
+      {% endfor %}
+    </div>
+  </fieldset>
+
+  <button type="submit">Generate</button>
+</form>
+
+<h2>Stories</h2>
+{% if stories %}
+<div class="card story-list">
+  {% for s in stories %}
+  <a href="/stories/{{ s.story_id }}">
+    <span><span class="status-dot {{ 'ready' if s.scene_count > 0 else 'pending' }}" aria-hidden="true"></span>{{ s.title }} <span class="meta">({{ s.cefr }}, {{ s.scene_count }} scenes)</span></span>
+    <span class="meta">{{ s.created_at }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<p style="color:var(--text-dim)">No stories yet. Create one above.</p>
+{% endif %}
+
+<script>
+  document.getElementById("btn_auto_gen").addEventListener("click", async function () {
+    var promptInput = document.getElementById("auto_prompt");
+    var promptVal = promptInput.value.trim();
+    if (!promptVal) {
+      alert("Please enter a short story description or idea first!");
+      return;
+    }
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = "Drafting Story... ✨";
+    var cefr = document.getElementById("cefr").value || "B1";
+    try {
+      var resp = await fetch("/api/generate-story", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: promptVal, cefr: cefr })
+      });
+      if (resp.ok) {
+        var data = await resp.json();
+        if (data.title) document.getElementById("title").value = data.title;
+        if (data.source_text) document.getElementById("source_text").value = data.source_text;
+      } else {
+        alert("Story drafting failed. Please try again.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Story drafting failed. Please try again.");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Magic Draft ✨";
+    }
+  });
+</script>
+
+{% endblock %}
